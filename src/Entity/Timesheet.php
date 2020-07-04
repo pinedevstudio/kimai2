@@ -530,7 +530,6 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
     }
 
     /**
-     * @internal only here for symfony forms
      * @return Collection|MetaTableTypeInterface[]
      */
     public function getMetaFields(): Collection
