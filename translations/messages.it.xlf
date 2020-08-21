@@ -260,6 +260,10 @@
                 <source>label.project</source>
                 <target>Progetto</target>
             </trans-unit>
+            <trans-unit id="label.task">
+                 <source>label.task</source>
+                 <target>Task</target>
+            </trans-unit>
             <trans-unit id="label.tag">
                 <source>label.tag</source>
                 <target>Tags</target>

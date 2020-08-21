@@ -111,6 +111,12 @@
     {{ macro.label_color_dot('project', isVisible, project.name, url, (project.color ?? project.customer.color)) }}
 {% endmacro %}
 
+{% macro label_task(task, url) %}
+    {% import _self as macro %}
+    {% set isVisible = true %}
+    {{ macro.label_color_dot('project', isVisible, task.title, url, (task.activity.color ?? task.project.color ?? task.project.customer.color)) }}
+{% endmacro %}
+
 {% macro label_customer(customer, url) %}
     {% import _self as macro %}
     {% set isVisible = customer.visible %}

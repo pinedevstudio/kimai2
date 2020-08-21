@@ -186,12 +186,33 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
     private $meta;
 
     /**
+     * @var Tasks[]|Collection
+     *
+     * @ORM\ManyToMany(targetEntity="KimaiPlugin\TaskManagementBundle\Entity\Task", cascade={"persist"})
+     * @ORM\JoinTable(
+     *  name="kimai2_task_timesheets",
+     *  joinColumns={
+     *      @ORM\JoinColumn(name="timesheet_id", referencedColumnName="id", onDelete="CASCADE")
+     *  },
+     *  inverseJoinColumns={
+     *      @ORM\JoinColumn(name="task_id", referencedColumnName="id", onDelete="CASCADE", unique=true)
+     *  }
+     * )
+     */
+    private $tasks;
+
+    /**
      * Default constructor, initializes collections
      */
     public function __construct()
     {
         $this->tags = new ArrayCollection();
         $this->meta = new ArrayCollection();
+    }
+
+    public function getTasks(): Collection
+    {
+        return $this->tasks;
     }
 
     /**

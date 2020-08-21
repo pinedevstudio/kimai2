@@ -28,6 +28,7 @@
 {% set columns = columns|merge({
     'customer': {'class': 'hidden-xs hidden-sm hidden-md'},
     'project': {'class': 'hidden-xs hidden-sm hidden-md'},
+    'task': {'class': 'hidden-xs hidden-sm hidden-md'},
     'activity': {'class': 'hidden-xs hidden-sm'},
     'description': {'class': 'hidden-xs hidden-sm'},
 }) %}
@@ -144,6 +145,11 @@
                 <td class="{{ tables.data_table_column_class(tableName, columns, 'project') }}">
                     {{ widgets.label_project(entry.project) }}
                 </td>
+
+                <td class="{{ tables.data_table_column_class(tableName, columns, 'task') }}">
+                    {{ widgets.label_task(entry.tasks[0]) }}
+                </td>
+
                 <td class="{{ tables.data_table_column_class(tableName, columns, 'activity') }}">
                     {{ widgets.label_activity(entry.activity) }}
                 </td>
