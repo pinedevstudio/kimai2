@@ -772,10 +772,20 @@ class TimesheetRepository extends EntityRepository
             }
 
             if ($searchTerm->hasSearchTerm()) {
+                $qb->leftJoin('t.meta', 'meta');
                 $searchAnd->add(
-                    $qb->expr()->like('t.description', ':searchTerm')
+                    $qb->expr()->orX(
+                        $qb->expr()->like('t.description', ':searchTerm'),
+                        $qb->expr()->andX(
+                            $qb->expr()->eq('meta.name', ':task_title'),
+                            $qb->expr()->like('meta.value', ':searchTerm')
+                        )
+
+                    )
                 );
+
                 $qb->setParameter('searchTerm', '%' . $searchTerm->getSearchTerm() . '%');
+                $qb->setParameter('task_title', 'task_title');
             }
 
             if ($searchAnd->count() > 0) {
