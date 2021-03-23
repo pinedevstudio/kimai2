@@ -1,9 +1,13 @@
 # ========== KIMAI ==========
 # some hosters require a htaccess to change the PHP version
 .htaccess
+/public/.htaccess
 
 .idea/
 .DS_Store
+composer.lock
+error_log
+symfony.lock
 
 # for symfony local webserver
 php.ini
