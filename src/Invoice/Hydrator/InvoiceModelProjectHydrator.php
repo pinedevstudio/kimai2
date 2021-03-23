@@ -53,11 +53,11 @@ class InvoiceModelProjectHydrator implements InvoiceModelHydrator
             $prefix . 'end_date' => null !== $project->getEnd() ? $formatter->getFormattedDateTime($project->getEnd()) : '',
             $prefix . 'order_date' => null !== $project->getOrderDate() ? $formatter->getFormattedDateTime($project->getOrderDate()) : '',
             $prefix . 'budget_money' => $formatter->getFormattedMoney($project->getBudget(), $currency),
-            $prefix . 'budget_money_nc' => $formatter->getFormattedMoney($project->getBudget(), null),
+            $prefix . 'budget_money_nc' => $formatter->getFormattedMoney($project->getBudget(), $currency, false),
             $prefix . 'budget_money_plain' => $project->getBudget(),
             $prefix . 'budget_time' => $project->getTimeBudget(),
             $prefix . 'budget_time_decimal' => $formatter->getFormattedDecimalDuration($project->getTimeBudget()),
-            $prefix . 'budget_time_minutes' => number_format($project->getTimeBudget() / 60),
+            $prefix . 'budget_time_minutes' => (int) ($project->getTimeBudget() / 60),
         ];
 
         foreach ($project->getVisibleMetaFields() as $metaField) {

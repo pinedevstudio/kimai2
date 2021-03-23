@@ -10,14 +10,10 @@
 namespace App\Twig;
 
 use App\Constants;
-use App\Entity\Timesheet;
-use App\Utils\Duration;
-use App\Utils\LocaleSettings;
-use NumberFormatter;
-use Symfony\Component\Intl\Countries;
-use Symfony\Component\Intl\Currencies;
-use Symfony\Component\Intl\Languages;
-use Symfony\Component\Intl\Locales;
+use App\Entity\Activity;
+use App\Entity\Customer;
+use App\Entity\EntityWithMetaFields;
+use App\Entity\Project;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
@@ -28,50 +24,14 @@ use Twig\TwigFunction;
 class Extensions extends AbstractExtension
 {
     /**
-     * @var LocaleSettings
-     */
-    protected $localeSettings;
-    /**
-     * @var string
-     */
-    protected $locale;
-    /**
-     * @var Duration
-     */
-    protected $durationFormatter;
-    /**
-     * @var NumberFormatter
-     */
-    protected $numberFormatter;
-    /**
-     * @var NumberFormatter
-     */
-    protected $moneyFormatter;
-
-    /**
-     * @param LocaleSettings $localeSettings
-     */
-    public function __construct(LocaleSettings $localeSettings)
-    {
-        $this->localeSettings = $localeSettings;
-        $this->durationFormatter = new Duration();
-    }
-
-    /**
      * {@inheritdoc}
      */
     public function getFilters()
     {
         return [
-            new TwigFilter('duration', [$this, 'duration']),
-            new TwigFilter('duration_decimal', [$this, 'durationDecimal']),
-            new TwigFilter('money', [$this, 'money']),
-            new TwigFilter('currency', [$this, 'currency']),
-            new TwigFilter('country', [$this, 'country']),
-            new TwigFilter('language', [$this, 'language']),
-            new TwigFilter('amount', [$this, 'amount']),
             new TwigFilter('docu_link', [$this, 'documentationLink']),
             new TwigFilter('multiline_indent', [$this, 'multilineIndent']),
+            new TwigFilter('color', [$this, 'color']),
         ];
     }
 
@@ -81,9 +41,36 @@ class Extensions extends AbstractExtension
     public function getFunctions()
     {
         return [
-            new TwigFunction('locales', [$this, 'getLocales']),
             new TwigFunction('class_name', [$this, 'getClassName']),
         ];
+    }
+
+    public function color(EntityWithMetaFields $entity): ?string
+    {
+        if ($entity instanceof Activity) {
+            if (!empty($entity->getColor())) {
+                return $entity->getColor();
+            }
+
+            if (null !== $entity->getProject()) {
+                $entity = $entity->getProject();
+            }
+        }
+
+        if ($entity instanceof Project) {
+            if (!empty($entity->getColor())) {
+                return $entity->getColor();
+            }
+            $entity = $entity->getCustomer();
+        }
+
+        if ($entity instanceof Customer) {
+            if (!empty($entity->getColor())) {
+                return $entity->getColor();
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -105,115 +92,19 @@ class Extensions extends AbstractExtension
             return '';
         }
 
-        $parts = explode("\r\n", $string);
-        if (\count($parts) === 1) {
-            $parts = explode("\n", $string);
+        $parts = [];
+
+        foreach (explode("\r\n", $string) as $part) {
+            foreach (explode("\n", $part) as $tmp) {
+                $parts[] = $tmp;
+            }
         }
 
         $parts = array_map(function ($part) use ($indent) {
             return $indent . $part;
         }, $parts);
 
-        return implode("\n", $parts);
-    }
-
-    /**
-     * Transforms seconds into a duration string.
-     *
-     * @param int|Timesheet $duration
-     * @param bool $decimal
-     * @return string
-     */
-    public function duration($duration, $decimal = false)
-    {
-        if ($decimal) {
-            return $this->durationDecimal($duration);
-        }
-
-        $duration = $this->getSecondsForDuration($duration);
-        $format = $this->localeSettings->getDurationFormat();
-
-        return $this->formatDuration($duration, $format);
-    }
-
-    /**
-     * Transforms seconds into a decimal formatted duration string.
-     *
-     * @param int|Timesheet $duration
-     * @return string
-     */
-    public function durationDecimal($duration)
-    {
-        $duration = $this->getSecondsForDuration($duration);
-
-        return $this->getNumberFormatter()->format(number_format($duration / 3600, 2));
-    }
-
-    /**
-     * @param string|float $amount
-     * @return bool|false|string
-     */
-    public function amount($amount)
-    {
-        return $this->getNumberFormatter()->format($amount);
-    }
-
-    private function getSecondsForDuration($duration): int
-    {
-        if (null === $duration) {
-            $duration = 0;
-        }
-
-        if ($duration instanceof Timesheet) {
-            if (null === $duration->getEnd()) {
-                $duration = time() - $duration->getBegin()->getTimestamp();
-            } else {
-                $duration = $duration->getDuration();
-            }
-        }
-
-        return (int) $duration;
-    }
-
-    protected function formatDuration(int $seconds, string $format): string
-    {
-        if ($seconds < 0) {
-            return '?';
-        }
-
-        return $this->durationFormatter->format($seconds, $format);
-    }
-
-    /**
-     * @param string $currency
-     * @return string
-     */
-    public function currency($currency)
-    {
-        return Currencies::getSymbol($currency);
-    }
-
-    /**
-     * @param string $language
-     * @return string
-     */
-    public function language($language)
-    {
-        return Languages::getName($language, $this->locale);
-    }
-
-    /**
-     * @param string $country
-     * @return string
-     */
-    public function country($country)
-    {
-        $country = strtoupper($country);
-        if (Countries::exists($country)) {
-            return Countries::getName($country);
-        }
-
-        return $country;
+        return implode(PHP_EOL, $parts);
     }
 
     /**
@@ -223,63 +114,5 @@ class Extensions extends AbstractExtension
     public function documentationLink($url = '')
     {
         return Constants::HOMEPAGE . '/documentation/' . $url;
-    }
-
-    private function initLocale()
-    {
-        $locale = $this->localeSettings->getLocale();
-
-        if ($this->locale === $locale) {
-            return;
-        }
-
-        $this->locale = $locale;
-        $this->numberFormatter = new NumberFormatter($locale, NumberFormatter::DECIMAL);
-        $this->moneyFormatter = new NumberFormatter($locale, NumberFormatter::CURRENCY);
-    }
-
-    private function getNumberFormatter(): NumberFormatter
-    {
-        $this->initLocale();
-
-        return $this->numberFormatter;
-    }
-
-    private function getMoneyFormatter(): NumberFormatter
-    {
-        $this->initLocale();
-
-        return $this->moneyFormatter;
-    }
-
-    /**
-     * @param float $amount
-     * @param string $currency
-     * @return string
-     */
-    public function money($amount, $currency = null)
-    {
-        if (null !== $currency) {
-            return $this->getMoneyFormatter()->formatCurrency($amount, $currency);
-        }
-
-        return $this->getNumberFormatter()->format($amount);
-    }
-
-    /**
-     * Takes the list of codes of the locales (languages) enabled in the
-     * application and returns an array with the name of each locale written
-     * in its own language (e.g. English, Français, Español, etc.)
-     *
-     * @return array
-     */
-    public function getLocales()
-    {
-        $locales = [];
-        foreach ($this->localeSettings->getAvailableLanguages() as $locale) {
-            $locales[] = ['code' => $locale, 'name' => Locales::getName($locale, $locale)];
-        }
-
-        return $locales;
     }
 }

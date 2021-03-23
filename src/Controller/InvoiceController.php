@@ -23,6 +23,7 @@ use App\Repository\InvoiceTemplateRepository;
 use App\Repository\Query\BaseQuery;
 use App\Repository\Query\InvoiceQuery;
 use App\Timesheet\UserDateTimeFactory;
+use Exception;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\Form\SubmitButton;
@@ -83,7 +84,6 @@ final class InvoiceController extends AbstractController
             $this->flashWarning('invoice.first_template');
         }
 
-        $showPreview = false;
         $model = null;
 
         $query = $this->getDefaultQuery();
@@ -92,6 +92,11 @@ final class InvoiceController extends AbstractController
         $form->submit($request->query->all(), false);
 
         if ($this->isGranted('create_invoice') && $form->isValid()) {
+            // use the current request locale as fallback, if no translation was configured
+            if (null !== $query->getTemplate() && null === $query->getTemplate()->getLanguage()) {
+                $query->getTemplate()->setLanguage($request->getLocale());
+            }
+
             try {
                 /** @var SubmitButton $createButton */
                 $createButton = $form->get('create');
@@ -104,7 +109,7 @@ final class InvoiceController extends AbstractController
                 if ($printButton->isClicked()) {
                     return $this->service->renderInvoice($query, $this->dispatcher);
                 }
-            } catch (\Exception $ex) {
+            } catch (Exception $ex) {
                 $this->logException($ex);
                 $this->flashError('action.update.error', ['%reason%' => 'check doctor/logs']);
             }
@@ -112,29 +117,23 @@ final class InvoiceController extends AbstractController
             /** @var SubmitButton $previewButton */
             $previewButton = $form->get('preview');
             if ($previewButton->isClicked()) {
-                $showPreview = true;
-            }
-        }
-
-        try {
-            $model = $this->service->createModel($query);
-            if ($showPreview) {
-                $entries = $this->service->findInvoiceItems($query);
-                if (!empty($entries)) {
-                    $model->addEntries($entries);
+                try {
+                    $model = $this->service->createModel($query);
+                    $entries = $this->service->findInvoiceItems($query);
+                    if (!empty($entries)) {
+                        $model->addEntries($entries);
+                    }
+                } catch (Exception $ex) {
+                    $this->logException($ex);
+                    $this->flashError($ex->getMessage());
                 }
             }
-        } catch (\Exception $ex) {
-            $this->logException($ex);
-            $this->flashError($ex->getMessage());
-            $showPreview = false;
         }
 
         return $this->render('invoice/index.html.twig', [
             'query' => $query,
             'model' => $model,
             'form' => $form->createView(),
-            'preview' => $showPreview,
         ]);
     }
 
@@ -174,7 +173,7 @@ final class InvoiceController extends AbstractController
             $file = $this->service->getInvoiceFile($invoice);
 
             return $this->file($file->getRealPath(), $file->getBasename());
-        } catch (\Exception $ex) {
+        } catch (Exception $ex) {
             $this->flashError($ex->getMessage());
         }
 
@@ -190,7 +189,7 @@ final class InvoiceController extends AbstractController
         try {
             $this->service->changeInvoiceStatus($invoice, $status);
             $this->flashSuccess('action.update.success');
-        } catch (\Exception $ex) {
+        } catch (Exception $ex) {
             $this->flashError('action.update.error');
         }
 
@@ -206,7 +205,7 @@ final class InvoiceController extends AbstractController
         try {
             $this->service->deleteInvoice($invoice);
             $this->flashSuccess('action.delete.success');
-        } catch (\Exception $ex) {
+        } catch (Exception $ex) {
             $this->flashError('action.delete.error');
         }
 
@@ -284,29 +283,34 @@ final class InvoiceController extends AbstractController
      */
     public function uploadDocumentAction(Request $request, string $projectDirectory, InvoiceDocumentRepository $documentRepository)
     {
-        $dir = $documentRepository->getCustomInvoiceDirectory();
-        $invoiceDir = $projectDirectory . DIRECTORY_SEPARATOR . $dir;
+        $dir = $documentRepository->getUploadDirectory();
+        $invoiceDir = $dir;
+
+        // do not execute realpath, as it will return an empty string if the invoice directory is NOT existing!
+        if ($invoiceDir[0] !== '/') {
+            $invoiceDir = $projectDirectory . DIRECTORY_SEPARATOR . $dir;
+        }
+
         $canUpload = true;
-        $form = null;
 
         if (!file_exists($invoiceDir)) {
-            @mkdir($invoiceDir);
+            @mkdir($invoiceDir, 0777);
         }
-        if (!file_exists($invoiceDir)) {
-            $this->flashError(sprintf('Invoice directory is not existing and could not be created: %s', $dir));
+
+        if (!is_dir($invoiceDir)) {
+            $this->flashError(sprintf('Invoice directory "%s" is not existing and could not be created.', $dir));
+            $canUpload = false;
+        } elseif (!is_writable($invoiceDir)) {
+            $this->flashError(sprintf('Invoice directory "%s" cannot be written.', $dir));
             $canUpload = false;
         }
-        if (!is_writable($invoiceDir)) {
-            $this->flashError(sprintf('Invoice directory cannot be written: %s', $dir));
-            $canUpload = false;
-        }
+
+        $form = $this->createForm(InvoiceDocumentUploadForm::class, null, [
+            'action' => $this->generateUrl('admin_invoice_document_upload', []),
+            'method' => 'POST'
+        ]);
 
         if ($canUpload) {
-            $form = $this->createForm(InvoiceDocumentUploadForm::class, null, [
-                'action' => $this->generateUrl('admin_invoice_document_upload', []),
-                'method' => 'POST'
-            ]);
-
             $form->handleRequest($request);
 
             if ($form->isSubmitted() && $form->isValid()) {
@@ -325,7 +329,7 @@ final class InvoiceController extends AbstractController
                     $this->flashSuccess('action.update.success');
 
                     return $this->redirectToRoute('admin_invoice_document_upload');
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $this->flashError(
                         sprintf('Failed uploading invoice document: %e', $e->getMessage())
                     );
@@ -334,8 +338,8 @@ final class InvoiceController extends AbstractController
         }
 
         return $this->render('invoice/document_upload.html.twig', [
-            'form' => (null !== $form) ? $form->createView() : null,
-            'documents' => $this->service->getDocuments(),
+            'form' => $form->createView(),
+            'documents' => $this->service->getDocuments(true),
             'baseDirectory' => $projectDirectory . DIRECTORY_SEPARATOR,
         ]);
     }
@@ -365,12 +369,12 @@ final class InvoiceController extends AbstractController
      * @Route(path="/template/{id}/delete", name="admin_invoice_template_delete", methods={"GET", "POST"})
      * @Security("is_granted('manage_invoice_template')")
      */
-    public function deleteTemplate(InvoiceTemplate $template, Request $request): Response
+    public function deleteTemplate(InvoiceTemplate $template): Response
     {
         try {
             $this->templateRepository->removeTemplate($template);
             $this->flashSuccess('action.delete.success');
-        } catch (\Exception $ex) {
+        } catch (Exception $ex) {
             $this->flashError('action.delete.error', ['%reason%' => $ex->getMessage()]);
         }
 
@@ -389,7 +393,7 @@ final class InvoiceController extends AbstractController
                 $this->flashSuccess('action.update.success');
 
                 return $this->redirectToRoute('admin_invoice_template');
-            } catch (\Exception $ex) {
+            } catch (Exception $ex) {
                 $this->flashError('action.update.error', ['%reason%' => $ex->getMessage()]);
             }
         }

@@ -16,6 +16,7 @@ use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 
 /**
+ * @covers \App\Invoice\Renderer\AbstractTwigRenderer
  * @covers \App\Invoice\Renderer\TextRenderer
  * @group integration
  */
@@ -85,5 +86,15 @@ class TextRendererTest extends KernelTestCase
             }
         }
         self::assertEquals(\count($model->getCalculator()->getEntries()), substr_count($content, PHP_EOL . '---' . PHP_EOL));
+        $this->assertStringContainsString(
+            'entry.description' . PHP_EOL .
+            '	foo' . PHP_EOL .
+            '	foo' . PHP_EOL .
+            '	foo' . PHP_EOL .
+            '	bar' . PHP_EOL .
+            '	bar' . PHP_EOL .
+            '	Hello',
+            $content
+        );
     }
 }

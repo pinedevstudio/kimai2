@@ -20,7 +20,6 @@ class PluginManager
 
     /**
      * @param PluginInterface[] $plugins
-     * @throws \Exception
      */
     public function __construct(iterable $plugins)
     {
@@ -31,7 +30,6 @@ class PluginManager
 
     /**
      * @param PluginInterface $plugin
-     * @throws \Exception
      */
     public function addPlugin(PluginInterface $plugin)
     {
@@ -96,7 +94,8 @@ class PluginManager
         $json = json_decode(file_get_contents($composer), true);
 
         $reqVersion = $json['extra']['kimai']['require'] ?? 'unknown';
-        $version = $json['extra']['kimai']['version'] ?? 'unknown';
+        // the version field is required if we use composer to install a plugin via var/packages/
+        $version = $json['extra']['kimai']['version'] ?? ($json['version'] ?? 'unknown');
         $description = $json['description'] ?? '';
 
         $homepage = $json['homepage'] ?? Constants::HOMEPAGE . '/store/';

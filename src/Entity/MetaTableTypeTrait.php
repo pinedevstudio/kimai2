@@ -11,6 +11,7 @@ namespace App\Entity;
 
 use App\Form\Type\YesNoType;
 use Doctrine\ORM\Mapping as ORM;
+use JMS\Serializer\Annotation as Serializer;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Validator\Constraint;
@@ -21,6 +22,8 @@ trait MetaTableTypeTrait
     /**
      * @var int|null
      *
+     * @Serializer\Exclude()
+     *
      * @ORM\Id
      * @ORM\GeneratedValue
      * @ORM\Column(name="id", type="integer")
@@ -28,7 +31,12 @@ trait MetaTableTypeTrait
     private $id;
 
     /**
+     * Name of the meta (custom) field
+     *
      * @var string
+     *
+     * @Serializer\Expose()
+     * @Serializer\Groups({"Default"})
      *
      * @ORM\Column(name="name", type="string", length=50, nullable=false)
      * @Assert\NotNull()
@@ -37,7 +45,12 @@ trait MetaTableTypeTrait
     private $name;
 
     /**
+     * Value of the meta (custom) field
+     *
      * @var string
+     *
+     * @Serializer\Expose()
+     * @Serializer\Groups({"Default"})
      *
      * @ORM\Column(name="value", type="string", length=255, nullable=true)
      */
@@ -76,6 +89,10 @@ trait MetaTableTypeTrait
      * @var array
      */
     private $options = [];
+    /**
+     * @var int
+     */
+    private $order = 0;
 
     public function getName(): ?string
     {
@@ -203,6 +220,7 @@ trait MetaTableTypeTrait
             ->setIsVisible($meta->isVisible())
             ->setLabel($meta->getLabel())
             ->setOptions($meta->getOptions())
+            ->setOrder($meta->getOrder())
         ;
 
         return $this;
@@ -234,6 +252,18 @@ trait MetaTableTypeTrait
     public function getOptions(): array
     {
         return $this->options;
+    }
+
+    public function getOrder(): int
+    {
+        return $this->order;
+    }
+
+    public function setOrder(int $order): MetaTableTypeInterface
+    {
+        $this->order = $order;
+
+        return $this;
     }
 
     public function __clone()

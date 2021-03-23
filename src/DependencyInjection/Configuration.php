@@ -11,6 +11,7 @@ namespace App\DependencyInjection;
 
 use App\Entity\Customer;
 use App\Entity\User;
+use App\Repository\InvoiceDocumentRepository;
 use App\Timesheet\Rounding\RoundingInterface;
 use App\Widget\Type\CompoundRow;
 use App\Widget\Type\Counter;
@@ -37,22 +38,20 @@ class Configuration implements ConfigurationInterface
         $node
             ->children()
                 ->scalarNode('data_dir')
-                    ->isRequired()
+                    ->defaultNull()
                     ->validate()
                         ->ifTrue(function ($value) {
+                            if (null === $value) {
+                                return false;
+                            }
+
                             return !file_exists($value);
                         })
                         ->thenInvalid('Data directory does not exist')
                     ->end()
                 ->end()
                 ->scalarNode('plugin_dir')
-                    ->isRequired()
-                    ->validate()
-                        ->ifTrue(function ($value) {
-                            return !file_exists($value);
-                        })
-                        ->thenInvalid('Plugin directory does not exist')
-                    ->end()
+                    ->setDeprecated('Changing the plugin directory via "kimai.plugin_dir" is not supported since 1.9')
                 ->end()
                 ->append($this->getUserNode())
                 ->append($this->getTimesheetNode())
@@ -196,6 +195,18 @@ class Configuration implements ConfigurationInterface
                         ->booleanNode('allow_future_times')
                             ->defaultTrue()
                         ->end()
+                        ->booleanNode('allow_overlapping_records')
+                            ->defaultTrue()
+                        ->end()
+                        ->scalarNode('lockdown_period_start')
+                            ->defaultNull()
+                        ->end()
+                        ->scalarNode('lockdown_period_end')
+                            ->defaultNull()
+                        ->end()
+                        ->scalarNode('lockdown_grace_period')
+                            ->defaultNull()
+                        ->end()
                     ->end()
                 ->end()
             ->end()
@@ -217,7 +228,7 @@ class Configuration implements ConfigurationInterface
                     ->scalarPrototype()->end()
                     ->defaultValue([
                         'var/invoices/',
-                        'templates/invoice/renderer/'
+                        InvoiceDocumentRepository::DEFAULT_DIRECTORY
                     ])
                 ->end()
                 ->arrayNode('documents')
@@ -226,7 +237,7 @@ class Configuration implements ConfigurationInterface
                     ->defaultValue([])
                 ->end()
                 ->booleanNode('simple_form')
-                    ->defaultTrue()
+                    ->defaultFalse()
                 ->end()
                 ->scalarNode('number_format')
                     ->defaultValue('{Y}/{cy,3}')
