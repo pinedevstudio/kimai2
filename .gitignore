@@ -2,6 +2,7 @@
 # some hosters require a htaccess to change the PHP version
 .htaccess
 /public/.htaccess
+/public/.user.ini
 
 .idea/
 .DS_Store
